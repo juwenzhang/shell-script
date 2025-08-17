@@ -7,11 +7,20 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "scripts/*": ["scripts/*"],
+      "MAPPPER/*": ["scripts/configs/mapper/*"],
+      "BOOT/*": ["scripts/configs/boot/*"],
+      "TYPES/*": ["scripts/configs/types/*"],
+      "UTILS/*": ["scripts/configs/utils/*"],
+    }
   },
   "include": [
     "src/**/*",
-    "rollup.config.ts"
+    "script/**/*"
   ],
   "exclude": [
     "node_modules",

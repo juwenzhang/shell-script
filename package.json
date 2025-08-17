@@ -7,6 +7,9 @@
   "scripts": {
     "build": "rollup -c rollup.config.ts",
     "watch": "rollup -c rollup.config.ts --watch",
+    "start:cjs": "pnpm run build && node dist/bundle-cjs.min.js",
+    "start:esm": "pnpm run build && node dist/bundle-esm.min.js",
+    "start": "ts-node ./scripts/runtiming/start.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,8 +20,10 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.4",
+    "@types/node": "^24.3.0",
     "rollup": "^4.46.2",
     "rollup-plugin-license": "^3.6.0",
+    "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.9.2"
   }

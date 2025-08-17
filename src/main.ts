@@ -1,5 +1,12 @@
-function add(num1: number, num2: number) {
-    return num1 + num2
-}
-
-console.log(add(1, 2))
+import { 
+    GLOBAL_CONFIG, 
+    NODEJS_GLOBAL_CONFIGS,
+    RUST_GLOBAL_CONFIGS,
+    GO_GLOBAL_CONFIGS,
+    GIT_GLOBAL_CONFIGS 
+} from 'BOOT/boot'
+console.log(GLOBAL_CONFIG)
+console.log(NODEJS_GLOBAL_CONFIGS)
+console.log(RUST_GLOBAL_CONFIGS)
+console.log(GO_GLOBAL_CONFIGS)
+console.log(GIT_GLOBAL_CONFIGS)

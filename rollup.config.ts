@@ -8,18 +8,25 @@ import fs from 'fs'
 // @ts-ignore
 import path from 'path'
 // @ts-ignore
-import { fileURLToPath } from 'url'
+import {fileURLToPath} from 'url'
+// @ts-ignore
+import process from 'process'
+// @ts-ignore
+import {execSync} from 'child_process'
 
+// 需要copy的文件名
 const FILE_NAMES = [
     'LICENSE',
     'README.md',
     'README.zh-cn.md',
     'package.json',
 ]
+// 权限优先级
 const PRIVILEGE = {
     ROOT: 0,
     TEMP: 1,
 }
+// package.json 中需要保留的字段
 const PACKAGE_VOLUME = [
     'name',
     'version',
@@ -67,6 +74,7 @@ const OUTPUT_FILE_NAME: Record<string, string> = {
     'esm-min': 'bundle-esm.min.js',
     'cjs-min': 'bundle-cjs.min.js',
 }
+let RETRY_COUNT = 5
 
 /**
  * 检查文件是否存在并且返回文件路径，优先使用 temp 目录
@@ -187,16 +195,16 @@ function formatREADME() {
     }
     const FORMAT_PKGS = PKGS.length ? FORMAT.PKGS + '\n' + PKGS.map((pkg) => {
         return `* ${pkg}`
-    }).join('\n') : '没有使用到的依赖'
+    }).join('\n') : '## 没有使用任何依赖'
     console.log(FORMAT_PKGS)
 
-    const FORMAT_CMD = "可以使用的脚本命令有:" + "\n" + CMD.map(cmd => {
+    const FORMAT_CMD = "## 可以使用的脚本命令有:" + "\n" + CMD.map(cmd => {
         const _cmd = FORMAT.CMD
         return '* ' + _cmd.replace('<script>', cmd)
     }).join('\n')
 
     const normal = FORMAT.NORMAL
-    const FORMAT_BASIC = '基本信息:\n' + BASIC.map(basic => {
+    const FORMAT_BASIC = '## 基本信息:\n' + BASIC.map(basic => {
         return '* ' + normal.replace('<key>', basic.key).replace('<value>', basic.value)
     }).join('\n')
 
@@ -205,6 +213,44 @@ function formatREADME() {
                                 .replace('<!-- BASIC -->', FORMAT_BASIC)
     fs.writeFileSync(path.join(DIST_DIR, 'README.md'), README_FORMAT)
     console.log('README.md 格式化完成')
+}
+
+/**
+ * 获取git配置（优先本地，其次全局）
+ */
+function getGetConfigFromLocal() {
+    try {
+        // 首先尝试获取本地配置
+        const GIT_CONFIG = execSync('git config --local --get user.name').toString().trim()
+        return GIT_CONFIG
+    } catch (localErr) {
+        try {
+            // 本地配置获取失败，尝试获取全局配置
+            const GIT_CONFIG = execSync('git config --global --get user.name').toString().trim()
+            console.log('本地git配置未设置，使用全局配置')
+            return GIT_CONFIG
+        } catch (globalErr) {
+            console.error('获取git配置失败（本地和全局都未设置）:')
+            console.error('请使用以下命令设置git配置：')
+            console.error('git config --global user.name "Your Name"')
+            process.exit(1);  // 优化一下，报错了直接退出
+        }
+    }
+}
+/**
+ * 格式化 LICENSE
+ */
+function formatLicense() {
+    const GIT_CONFIG = getGetConfigFromLocal()
+    if (!GIT_CONFIG) {
+        return
+    }
+    console.log('git 配置:', GIT_CONFIG)
+    const LICENSE = fs.readFileSync(path.join(TEMP_DIR, 'LICENSE'), 'utf-8')
+    const LICENSE_FORMAT = LICENSE.replace('<!-- year -->', new Date().getFullYear().toString())
+                                .replace('<!-- author -->', GIT_CONFIG)
+    fs.writeFileSync(path.join(DIST_DIR, 'LICENSE'), LICENSE_FORMAT)
+    console.log('LICENSE 格式化完成')
 }
 
 /**
@@ -277,9 +323,16 @@ function main() {
         copyFileSync()
         // 再格式化 README
         formatREADME()
+        // 再格式化 LICENSE
+        formatLicense()
         console.log('所有操作完成')
     } catch (err) {
-        console.error('执行过程中出错:', err)
+        if (RETRY_COUNT-- > 0) {
+            main()
+        } else {
+            console.error('执行过程中出错:', err)
+            process.exit(1)
+        }
     }
 }
 

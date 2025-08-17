@@ -1,0 +1,1 @@
+type MapperType = Record<string, string>
