@@ -1,0 +1,25 @@
+{
+  "name": "shell-script",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "rollup -c rollup.config.ts",
+    "watch": "rollup -c rollup.config.ts --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "juwenzhang",
+  "license": "MIT",
+  "packageManager": "pnpm@10.14.0",
+  "devDependencies": {
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "rollup": "^4.46.2",
+    "rollup-plugin-license": "^3.6.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.2"
+  }
+}
