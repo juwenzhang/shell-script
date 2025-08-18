@@ -42,15 +42,17 @@ const DIRNAME = path.dirname(fileURLToPath(import.meta.url))
 const TEMP_DIR = path.join(DIRNAME, 'temp')
 const DIST_DIR = path.join(DIRNAME, 'dist')
 const PKGS: string[] = []
+const DEV_PKGS: string[] = []
 const CMD: string[] = []
 const BASIC: {
     key: string
     value: string
 }[] = []
 const FORMAT = {
-    PKGS: '使用了的依赖有：',
+    PKGS: '## 使用了的依赖有：',
+    DEV_PKGS: '## 使用了的开发依赖有：',
     CMD: 'npm|pnpm|yarn run <script>',
-    NORMAL: '<key>是<value>',
+    NORMAL: '<key>: <value>',
 }
 const PACKAGE_PATH = path.join(DIRNAME, 'package.json')
 // rollup 的输出格式
@@ -78,7 +80,7 @@ let RETRY_COUNT = 5
 
 /**
  * 检查文件是否存在并且返回文件路径，优先使用 temp 目录
- * @returns 文件路径数组
+ * 文件路径数组
  */
 function fileExist() {
     const FILE_STAT_MAPPER = FILE_NAMES.map((file_name) => {
@@ -154,6 +156,16 @@ function collectPKGS() {
     }
 }
 /**
+ * 收集开发依赖
+ */
+function collectDEV_PKGS() {
+    const PACKAGE = JSON.parse(fs.readFileSync(PACKAGE_PATH, 'utf-8'))
+    const DEV_DEPENDENCIES = PACKAGE.devDependencies
+    for (const key in DEV_DEPENDENCIES) {
+        DEV_PKGS.push(key)
+    }
+}
+/**
  * 收集可使用脚本命令
  */
 function collectCMD() {
@@ -169,6 +181,7 @@ function collectCMD() {
 function getAllInfo() {
     collectBasic()
     collectPKGS()
+    collectDEV_PKGS()
     collectCMD()
 }
 /**
@@ -181,7 +194,8 @@ function formatREADME() {
     // 检查 README 中是否具备需要的 注释
     if (!README.includes('<!-- PKGS -->') ||
         !README.includes('<!-- CMD -->') ||
-        !README.includes('<!-- BASIC -->')) {
+        !README.includes('<!-- BASIC -->') ||
+        !README.includes('<!-- DEV_PKGS -->')) {
         // 进行在 README 中对应的 <!-- PKGS --> 方便后续的替换
         if (!README.includes('<!-- PKGS -->')) {
             README = README + '\n<!-- PKGS -->\n'
@@ -192,11 +206,17 @@ function formatREADME() {
         if (!README.includes('<!-- BASIC -->')) {
             README = README + '\n<!-- BASIC -->\n'
         }
+        if (!README.includes('<!-- DEV_PKGS -->')) {
+            README = README + '\n<!-- DEV_PKGS -->\n'
+        }
     }
     const FORMAT_PKGS = PKGS.length ? FORMAT.PKGS + '\n' + PKGS.map((pkg) => {
         return `* ${pkg}`
     }).join('\n') : '## 没有使用任何依赖'
-    console.log(FORMAT_PKGS)
+
+    const FORMAT_DEV_PKGS = DEV_PKGS.length ? FORMAT.DEV_PKGS + '\n' + DEV_PKGS.map((pkg) => {
+        return `* ${pkg}`
+    }).join('\n') : '## 没有使用任何开发依赖'
 
     const FORMAT_CMD = "## 可以使用的脚本命令有:" + "\n" + CMD.map(cmd => {
         const _cmd = FORMAT.CMD
@@ -205,52 +225,106 @@ function formatREADME() {
 
     const normal = FORMAT.NORMAL
     const FORMAT_BASIC = '## 基本信息:\n' + BASIC.map(basic => {
-        return '* ' + normal.replace('<key>', basic.key).replace('<value>', basic.value)
+        let content = basic.value;  
+        if (Array.isArray(content)) {
+            content = content.length ? content.join(', ') : '...'
+        }
+        return '* ' + normal.replace('<key>', basic.key).replace('<value>', content)
     }).join('\n')
 
     const README_FORMAT = README.replace('<!-- PKGS -->', '\n' + FORMAT_PKGS)
+                                .replace('<!-- DEV_PKGS -->', FORMAT_DEV_PKGS)
                                 .replace('<!-- CMD -->', FORMAT_CMD)
                                 .replace('<!-- BASIC -->', FORMAT_BASIC)
     fs.writeFileSync(path.join(DIST_DIR, 'README.md'), README_FORMAT)
     console.log('README.md 格式化完成')
 }
 
-/**
- * 获取git配置（优先本地，其次全局）
- */
+function getExecResult(cmd: string) {
+    try {
+        const result = execSync(cmd).toString().trim()
+        return result
+    } catch (err) {
+        console.error(`执行命令 ${cmd} 失败:`, err)
+        return ''
+    }
+}
+
 function getGetConfigFromLocal() {
     try {
         // 首先尝试获取本地配置
-        const GIT_CONFIG = execSync('git config --local --get user.name').toString().trim()
-        return GIT_CONFIG
-    } catch (localErr) {
-        try {
-            // 本地配置获取失败，尝试获取全局配置
-            const GIT_CONFIG = execSync('git config --global --get user.name').toString().trim()
-            console.log('本地git配置未设置，使用全局配置')
+        const GIT_CONFIG = getExecResult('git config --local --get user.name')
+        if (GIT_CONFIG) {
             return GIT_CONFIG
-        } catch (globalErr) {
-            console.error('获取git配置失败（本地和全局都未设置）:')
-            console.error('请使用以下命令设置git配置：')
-            console.error('git config --global user.name "Your Name"')
-            process.exit(1);  // 优化一下，报错了直接退出
         }
+        const GLOBAL_CONFIG = getExecResult('git config --global --get user.name')
+        if (GLOBAL_CONFIG) {
+            console.log('本地git配置未设置，使用全局配置:')
+            return GLOBAL_CONFIG
+        }
+        console.warn('获取git配置失败（本地和全局都未设置）')
+        console.warn('提示：可以使用以下命令设置git配置：git config --global user.name "Your Name"')
+        return ''
+    } catch (err) {
+        console.error('获取git配置时出现异常:', err)
+        return ''
     }
 }
 /**
- * 格式化 LICENSE
+ * 格式化 LICENSE，即使git配置获取失败也能返回默认内容
  */
-function formatLicense() {
-    const GIT_CONFIG = getGetConfigFromLocal()
-    if (!GIT_CONFIG) {
-        return
+function formatLicense(): string {
+    try {
+        let authorName = 'Anonymous'; // 默认作者名
+        try {
+            const GIT_CONFIG = getExecResult('git config --local --get user.name') 
+                || getExecResult('git config --global --get user.name');
+            if (GIT_CONFIG) {
+                authorName = GIT_CONFIG;
+                console.log('使用git配置的作者名:', authorName)
+            } else {
+                console.warn('未找到git配置，使用默认作者名')
+            }
+        } catch (gitErr) {
+            console.warn('获取git配置时出错，使用默认作者名:', gitErr.message)
+        }
+        const LICENSE = fs.readFileSync(path.join(TEMP_DIR, 'LICENSE'), 'utf-8')
+        const LICENSE_FORMAT = LICENSE.replace('<!-- year -->', new Date().getFullYear().toString())
+                                      .replace('<!-- author -->', authorName)
+        
+        fs.writeFileSync(path.join(DIST_DIR, 'LICENSE'), LICENSE_FORMAT)
+        return LICENSE_FORMAT;  // 返回格式化后的LICENSE
+    } catch (err) {
+        console.error('格式化LICENSE时出错:', err)
+        const defaultLicense = `MIT License
+
+Copyright (c) ${new Date().getFullYear()} Anonymous
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+        try {
+            fs.writeFileSync(path.join(DIST_DIR, 'LICENSE'), defaultLicense)
+        } catch (writeErr) {
+            console.error('写入默认LICENSE失败:', writeErr)
+        }
+        
+        return defaultLicense;
     }
-    console.log('git 配置:', GIT_CONFIG)
-    const LICENSE = fs.readFileSync(path.join(TEMP_DIR, 'LICENSE'), 'utf-8')
-    const LICENSE_FORMAT = LICENSE.replace('<!-- year -->', new Date().getFullYear().toString())
-                                .replace('<!-- author -->', GIT_CONFIG)
-    fs.writeFileSync(path.join(DIST_DIR, 'LICENSE'), LICENSE_FORMAT)
-    console.log('LICENSE 格式化完成')
 }
 
 /**
@@ -293,25 +367,32 @@ function buildOutputConfig() {
     return output_config;
 }
 
-// console.log(buildOutputConfig())
+// 延迟加载license内容，避免在配置阶段执行git命令
+function createLicensePlugin() {
+    return license({
+        banner: {
+            content: '', // 空内容，后续在main函数中处理
+        },
+    });
+}
+
+// 修改getPluginConfigs，使用延迟加载的license插件
+function getPluginConfigs() {
+    return [
+        json(),
+        typescript({
+            tsconfig: "./tsconfig.json",
+        }),
+        createLicensePlugin(),
+    ]
+}
 
 export default {
     input: 'src/main.ts',
-    // dts: true,
-    output: buildOutputConfig(),
-    plugins: [
-        json(),
-        typescript({
-            tsconfig: './tsconfig.json',
-        }),
-        license({
-            banner: {
-                content: {
-                    file: './temp/LICENSE',
-                },
-            },
-        }),
-    ],
+    // 推荐替代工具，使用 tsup 默认支持 dts 生成的呐
+    // dts: true,  // rollup 默认是不支持的呢，此时需要安装插件 rollup-plugin-dts
+    output: buildOutputConfig(), 
+    plugins: getPluginConfigs(), 
 };
 
 /**
@@ -323,11 +404,19 @@ function main() {
         copyFileSync()
         // 再格式化 README
         formatREADME()
-        // 再格式化 LICENSE
-        formatLicense()
-        console.log('所有操作完成')
+        // 尝试格式化 LICENSE，但即使失败也继续执行
+        try {
+            const formattedLicense = formatLicense();
+            if (formattedLicense) {
+                console.log('LICENSE 格式化完成')
+            }
+        } catch (licenseErr) {
+            console.warn('LICENSE 格式化失败，使用默认内容:', licenseErr.message)
+        }
+        console.log('所有必要操作完成')
     } catch (err) {
         if (RETRY_COUNT-- > 0) {
+            console.log(`重试中... (剩余次数: ${RETRY_COUNT})`)
             main()
         } else {
             console.error('执行过程中出错:', err)
