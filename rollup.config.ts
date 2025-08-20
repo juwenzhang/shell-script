@@ -21,6 +21,7 @@ import {
     DebugLogger,
     notifyReset
 } from "./scripts/runtiming/logger.ts"
+import generateI18n from './scripts/runtiming/generateI18n.ts'
 
 // 需要copy的文件名
 const FILE_NAMES = [
@@ -407,12 +408,21 @@ export default {
 /**
  * 主函数，确保复制文件完成后再格式化 README
  */
-function main() {
+async function main() {
     try {
         // 先复制文件
         copyFileSync()
         // 再格式化 README
-        formatREADME()
+        await formatREADME()
+        // 翻译文件
+        await generateI18n.translateFile(
+            path.join(DIST_DIR, 'README.md'), 
+            path.join(DIST_DIR, 'README.en.md')
+        )
+        await generateI18n.translateFile(
+            path.join(DIST_DIR, 'README.md'), 
+            path.join('./', 'README.en.md')
+        )
         // 尝试格式化 LICENSE，但即使失败也继续执行
         try {
             const formattedLicense = formatLicense();

@@ -30,6 +30,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@vitalets/google-translate-api": "^9.2.1",
     "chalk": "^5.6.0"
   }
 }
