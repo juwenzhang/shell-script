@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import chalk, { type ChalkInstance } from 'chalk'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -34,12 +35,12 @@ const levelNames: Record<LoggerLevelType, string> = {
     [LoggerLevel.SUCCESS]: LoggerLevelNames.SUCCESS
 }
 
-const loggerColorMap: Record<LoggerLevelType, string> = {
-    [LoggerLevel.DEBUG]: 'color: blue',
-    [LoggerLevel.INFO]: 'color: green',
-    [LoggerLevel.WARN]: 'color: yellow',
-    [LoggerLevel.ERROR]: 'color: red',
-    [LoggerLevel.SUCCESS]: 'color: green'
+const loggerColorMap: Record<LoggerLevelType, ChalkInstance> = {
+    [LoggerLevel.DEBUG]: chalk.gray,  // debug 模式用灰色
+    [LoggerLevel.INFO]: chalk.blue,   // info 模式用蓝色
+    [LoggerLevel.WARN]: chalk.yellow,  // warn 模式用黄色
+    [LoggerLevel.ERROR]: chalk.red,    // error 模式用红色
+    [LoggerLevel.SUCCESS]: chalk.greenBright  // success 模式用绿色
 }
 
 export interface LoggerOptions {
@@ -63,12 +64,12 @@ export class Logger {
         const now = new Date();
         const timestamp = now.toISOString().replace('T', ' ').slice(0, 23);
         if (this.showTimestamp) {
-            formattedMessage += `[${timestamp}] `;
+            formattedMessage += `${timestamp} `;
         }
         if (this.moduleName) {
-            formattedMessage += `[${this.moduleName}] `;
+            formattedMessage += `${this.moduleName} `;
         }
-        formattedMessage += `[${levelNames[level]}] `;
+        formattedMessage += `${levelNames[level]} `;
         formattedMessage += message;
         LoggerCollect.push(formattedMessage)
         return [formattedMessage, timestamp];
@@ -87,19 +88,19 @@ export class Logger {
         if (this.level <= level) {
             switch (level) {
                 case LoggerLevel.ERROR:
-                    console.error(`%c${formatted[0]}`, loggerColorMap[level], ...args);
+                    console.error(loggerColorMap[level](formatted[0]), ...args);
                     break;
                 case LoggerLevel.WARN:
-                    console.warn(`%c${formatted[0]}`, loggerColorMap[level], ...args);
+                    console.warn(loggerColorMap[level](formatted[0]), ...args);
                     break;
                 case LoggerLevel.DEBUG:
-                    console.debug(`%c${formatted[0]}`, loggerColorMap[level], ...args);
+                    console.debug(loggerColorMap[level](formatted[0]), ...args);
                     break;
                 case LoggerLevel.SUCCESS:
-                    console.log(`%c${formatted[0]}`, loggerColorMap[level], ...args);
+                    console.log(loggerColorMap[level](formatted[0]), ...args);
                     break;
                 default:
-                    console.log(`%c${formatted[0]}`, loggerColorMap[level], ...args);
+                    console.log(loggerColorMap[level](formatted[0]), ...args);
                     break;
             }
         }
