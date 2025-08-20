@@ -7,6 +7,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const LoggerCollect: string[] = []
 const DOCS_DIR = path.join(__dirname, '../../docs')
+// 保证 docs 存在的
+if (!fs.existsSync(DOCS_DIR)) {
+    fs.mkdirSync(DOCS_DIR)
+}
 export let WRITE_LOG_COUNT = 0
 
 export const LoggerLevel = {
@@ -49,16 +53,51 @@ export interface LoggerOptions {
     showTimestamp?: boolean;  // 是否显示时间戳
 }
 
-export class Logger {
-    private level: LoggerLevelType;
-    private moduleName?: string;
-    private showTimestamp: boolean;
+interface LoggerInterFace {
+    level: LoggerLevelType;
+    moduleName?: string;
+    showTimestamp: boolean;
+
+    notifyReset(): void;
+    getFileName(): string;
+    log<T>(level: LoggerLevelType, message: string, ...args: T[]): void;
+    debug<T>(message: string, ...args: T[]): void;
+    info<T>(message: string, ...args: T[]): void;
+    warn<T>(message: string, ...args: T[]): void;
+    error<T>(message: string, ...args: T[]): void;
+    success<T>(message: string, ...args: T[]): void;
+    setLevel(level: LoggerLevelType): void;
+    setModuleName(moduleName: string): void;
+    setShowTimestamp(showTimestamp: boolean): void;
+}
+
+export class Logger implements LoggerInterFace {
+    level: LoggerLevelType;
+    moduleName?: string;
+    showTimestamp: boolean;
 
     constructor(options: LoggerOptions = {}) {
         this.level = options.level || LoggerLevel.INFO;
         this.moduleName = options.moduleName;
         this.showTimestamp = options.showTimestamp !== false; 
     }
+
+    static getFileName() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const day = now.getDate();
+        return `${year}-${month}-${day}.md`
+    }
+
+    // 为了进行一些状态的重置，此时我们需要做的就是程序结束的时候调用这个方法
+    // 实现将一些状态重置，便于下次调用无副作用
+    static notifyReset() {
+        WRITE_LOG_COUNT = 0
+        fs.appendFileSync(LoggerFilePath, '\n\n\n')
+    }
+
+
     private formatMessage(level: LoggerLevelType, message: string): [string, string] {
         let formattedMessage = '';
         const now = new Date();
@@ -73,14 +112,6 @@ export class Logger {
         formattedMessage += message;
         LoggerCollect.push(formattedMessage)
         return [formattedMessage, timestamp];
-    }
-
-    static getFileName() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        const day = now.getDate();
-        return `${year}-${month}-${day}.md`
     }
 
     log<T>(level: LoggerLevelType, message: string, ...args: T[]): void {
@@ -149,9 +180,13 @@ export class Logger {
         this.showTimestamp = show;
     }
 
-    static notifyReset() {
-        WRITE_LOG_COUNT = 0
-        fs.appendFileSync(LoggerFilePath, '\n\n\n')
+    // 实现接口要求的实例方法
+    notifyReset(): void {
+        Logger.notifyReset();
+    }
+
+    getFileName(): string {
+        return Logger.getFileName();
     }
 }
 
