@@ -12,6 +12,7 @@
     "paths": {
       "@/*": ["src/*"],
       "scripts/*": ["scripts/*"],
+      "RUNTIMING/*": ["scripts/configs/runtiming/*"],
       "MAPPPER/*": ["scripts/configs/mapper/*"],
       "BOOT/*": ["scripts/configs/boot/*"],
       "TYPES/*": ["scripts/configs/types/*"],

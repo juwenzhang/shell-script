@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "type": "module",
-  "main": "index.js",
+  "types": "./src/index.ts",
+  "main": "./dist/bundle-cjs.min.js",
   "scripts": {
     "build": "rollup -c rollup.config.ts",
     "watch": "rollup -c rollup.config.ts --watch",

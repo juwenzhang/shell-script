@@ -13,6 +13,14 @@ import {fileURLToPath} from 'url'
 import process from 'process'
 // @ts-ignore
 import {execSync} from 'child_process'
+import {
+    SuccessLogger, 
+    InfoLogger, 
+    WarnLogger, 
+    ErrorLogger,
+    DebugLogger,
+    notifyReset
+} from "./scripts/runtiming/logger.ts"
 
 // 需要copy的文件名
 const FILE_NAMES = [
@@ -124,9 +132,9 @@ function copyFileSync() {
             const data = fs.readFileSync(file_stat.path)
             // 使用同步方式写入文件
             fs.writeFileSync(path.join(DIST_DIR, file_stat.fileName), data)
-            console.log(`文件 ${file_stat.fileName} 复制成功`)
+            InfoLogger(`文件 ${file_stat.fileName} 复制成功`)
         } catch (err) {
-            console.error(`文件 ${file_stat.fileName} 复制失败:`, err)
+            ErrorLogger(`文件 ${file_stat.fileName} 复制失败: ${err}`)
         }
     })
 }
@@ -237,7 +245,7 @@ function formatREADME() {
                                 .replace('<!-- CMD -->', FORMAT_CMD)
                                 .replace('<!-- BASIC -->', FORMAT_BASIC)
     fs.writeFileSync(path.join(DIST_DIR, 'README.md'), README_FORMAT)
-    console.log('README.md 格式化完成')
+    InfoLogger('README.md 格式化完成')
 }
 
 function getExecResult(cmd: string) {
@@ -259,14 +267,14 @@ function getGetConfigFromLocal() {
         }
         const GLOBAL_CONFIG = getExecResult('git config --global --get user.name')
         if (GLOBAL_CONFIG) {
-            console.log('本地git配置未设置，使用全局配置:')
+            InfoLogger(`本地git配置未设置，使用全局配置: ${GLOBAL_CONFIG}`)
             return GLOBAL_CONFIG
         }
-        console.warn('获取git配置失败（本地和全局都未设置）')
-        console.warn('提示：可以使用以下命令设置git配置：git config --global user.name "Your Name"')
+        WarnLogger('获取git配置失败（本地和全局都未设置）')
+        WarnLogger('提示：可以使用以下命令设置git配置：git config --global user.name "Your Name"')
         return ''
     } catch (err) {
-        console.error('获取git配置时出现异常:', err)
+        ErrorLogger(`获取git配置时出现异常: ${err}`)
         return ''
     }
 }
@@ -281,13 +289,14 @@ function formatLicense(): string {
                 || getExecResult('git config --global --get user.name');
             if (GIT_CONFIG) {
                 authorName = GIT_CONFIG;
-                console.log('使用git配置的作者名:', authorName)
+                InfoLogger(`使用git配置的作者名: ${authorName}`)
             } else {
-                console.warn('未找到git配置，使用默认作者名')
+                WarnLogger('未找到git配置，使用默认作者名')
             }
         } catch (gitErr) {
-            console.warn('获取git配置时出错，使用默认作者名:', gitErr.message)
+            WarnLogger(`获取git配置时出错，使用默认作者名: ${gitErr.message}`)   
         }
+        InfoLogger(`格式化LICENSE，作者名: ${authorName}`)
         const LICENSE = fs.readFileSync(path.join(TEMP_DIR, 'LICENSE'), 'utf-8')
         const LICENSE_FORMAT = LICENSE.replace('<!-- year -->', new Date().getFullYear().toString())
                                       .replace('<!-- author -->', authorName)
@@ -295,7 +304,7 @@ function formatLicense(): string {
         fs.writeFileSync(path.join(DIST_DIR, 'LICENSE'), LICENSE_FORMAT)
         return LICENSE_FORMAT;  // 返回格式化后的LICENSE
     } catch (err) {
-        console.error('格式化LICENSE时出错:', err)
+        ErrorLogger(`格式化LICENSE时出错: ${err.message}`)
         const defaultLicense = `MIT License
 
 Copyright (c) ${new Date().getFullYear()} Anonymous
@@ -320,7 +329,7 @@ SOFTWARE.`;
         try {
             fs.writeFileSync(path.join(DIST_DIR, 'LICENSE'), defaultLicense)
         } catch (writeErr) {
-            console.error('写入默认LICENSE失败:', writeErr)
+            ErrorLogger(`写入默认LICENSE失败: ${writeErr.message}`)
         }
         
         return defaultLicense;
@@ -408,18 +417,20 @@ function main() {
         try {
             const formattedLicense = formatLicense();
             if (formattedLicense) {
-                console.log('LICENSE 格式化完成')
+                InfoLogger('LICENSE 格式化完成')
             }
         } catch (licenseErr) {
-            console.warn('LICENSE 格式化失败，使用默认内容:', licenseErr.message)
+            WarnLogger(`LICENSE 格式化失败，使用默认内容: ${licenseErr.message}`)
         }
-        console.log('所有必要操作完成')
+        SuccessLogger('所有必要操作完成')
+        // 每次操作完后将本次的记录进行重制
+        notifyReset()
     } catch (err) {
         if (RETRY_COUNT-- > 0) {
-            console.log(`重试中... (剩余次数: ${RETRY_COUNT})`)
+            DebugLogger(`重试中... (剩余次数: ${RETRY_COUNT})`)
             main()
         } else {
-            console.error('执行过程中出错:', err)
+            ErrorLogger(`执行过程中出错: ${err.message}`)
             process.exit(1)
         }
     }
